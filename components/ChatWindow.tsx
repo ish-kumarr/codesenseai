@@ -1,4 +1,3 @@
-// components/ChatWindow.tsx
 "use client"
 
 import { useState, useEffect, useRef, FormEvent } from "react";
@@ -7,9 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"; // Added ScrollBar
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Repository } from "@/lib/github";
-import { Skeleton } from "@/components/ui/skeleton"; // For loading state
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Message {
   id: string;
@@ -20,7 +19,7 @@ interface Message {
 }
 
 interface ChatWindowProps {
-  repository: Repository; // Make repository prop mandatory
+  repository?: Repository;
 }
 
 export default function ChatWindow({ repository }: ChatWindowProps) {
@@ -43,7 +42,6 @@ export default function ChatWindow({ repository }: ChatWindowProps) {
   }, [repository]);
 
   useEffect(() => {
-    // Scroll to bottom when new messages are added or bot starts typing
     if (scrollViewportRef.current) {
       scrollViewportRef.current.scrollTop = scrollViewportRef.current.scrollHeight;
     }
@@ -51,7 +49,7 @@ export default function ChatWindow({ repository }: ChatWindowProps) {
 
   const handleSendMessage = async (e?: FormEvent<HTMLFormElement>) => {
     if (e) e.preventDefault();
-    if (!newMessage.trim() || isBotTyping) return;
+    if (!newMessage.trim() || isBotTyping || !repository) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -61,32 +59,32 @@ export default function ChatWindow({ repository }: ChatWindowProps) {
     };
     
     const currentQuestion = newMessage;
-    setNewMessage(""); // Clear input immediately
+    setNewMessage("");
 
-    // Add user message and set bot typing state
     setMessages(prev => [...prev, userMessage]);
     setIsBotTyping(true);
 
-    // Prepare chat history for the API (send only previous confirmed messages)
-    const chatHistoryForApi = messages.filter(msg => !msg.isLoading); 
+    const chatHistoryForApi = messages.filter(msg => !msg.isLoading);
 
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify({
           owner: repository.owner.login,
           repoName: repository.name,
           question: currentQuestion,
-          chatHistory: chatHistoryForApi, 
+          chatHistory: chatHistoryForApi,
         }),
       });
 
-      const data = await response.json(); // Always try to parse JSON
+      const data = await response.json();
 
       if (!response.ok) {
-        // Use error message from API if available, otherwise a generic one
-        throw new Error(data.error || data.answer || `API Error: ${response.status}`);
+        throw new Error(data.error || `API Error: ${response.status}`);
       }
       
       const botResponse: Message = {
@@ -113,9 +111,17 @@ export default function ChatWindow({ repository }: ChatWindowProps) {
 
   if (!repository) {
     return (
-      <Card className="h-full flex flex-col items-center justify-center">
-        <CardHeader><CardTitle>Loading Chat...</CardTitle></CardHeader>
-        <CardContent><Skeleton className="w-48 h-8" /></CardContent>
+      <Card className="h-full flex flex-col">
+        <CardHeader className="pb-3 border-b">
+          <CardTitle className="text-lg font-semibold tracking-tight">
+            CodeSense Chat
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex-1 flex items-center justify-center">
+          <p className="text-muted-foreground text-center">
+            Select a repository to start chatting with CodeSense
+          </p>
+        </CardContent>
       </Card>
     );
   }
@@ -124,12 +130,12 @@ export default function ChatWindow({ repository }: ChatWindowProps) {
     <Card className="h-full flex flex-col shadow-xl">
       <CardHeader className="pb-3 border-b">
         <CardTitle className="text-lg font-semibold tracking-tight">
-          CodeSense: {repository.full_name}
+          CodeSense Chat - {repository.full_name}
         </CardTitle>
       </CardHeader>
       
-      <ScrollArea className="flex-1 p-4" >
-         <div ref={scrollViewportRef} className="h-full overflow-y-auto"> {/* This div is for the ref */}
+      <ScrollArea className="flex-1 p-4">
+         <div ref={scrollViewportRef} className="h-full overflow-y-auto">
             <div className="space-y-4 mb-2">
             {messages.map((message) => (
                 <div
@@ -143,21 +149,18 @@ export default function ChatWindow({ repository }: ChatWindowProps) {
                     message.sender === "user" ? "flex-row-reverse" : ""
                     }`}
                 >
-                    <Avatar className="h-7 w-7 shrink-0 self-start mt-1"> {/* self-start, smaller */}
+                    <Avatar className="h-7 w-7 shrink-0 self-start mt-1">
                     {message.sender === "user" ? (
-                        <AvatarFallback className="text-xs">U</AvatarFallback>
+                        <AvatarFallback className="text-xs bg-primary text-primary-foreground">U</AvatarFallback>
                     ) : (
-                        <>
-                        <AvatarImage src="/codesense-avatar.png" alt="AI" /> {/* Place in /public */}
-                        <AvatarFallback className="text-xs">AI</AvatarFallback>
-                        </>
+                        <AvatarFallback className="text-xs bg-secondary">AI</AvatarFallback>
                     )}
                     </Avatar>
                     <div
-                    className={`rounded-xl px-3.5 py-2.5 text-sm shadow-sm ${ // Softer corners, more padding
+                    className={`rounded-xl px-3.5 py-2.5 text-sm shadow-sm ${
                         message.sender === "user"
-                        ? "bg-primary text-primary-foreground rounded-br-none" // Tail for user
-                        : "bg-muted rounded-bl-none" // Tail for bot
+                        ? "bg-primary text-primary-foreground rounded-br-none"
+                        : "bg-muted rounded-bl-none"
                     }`}
                     >
                     <pre className="whitespace-pre-wrap font-sans break-words">
@@ -177,8 +180,7 @@ export default function ChatWindow({ repository }: ChatWindowProps) {
                 <div className="flex justify-start">
                     <div className="flex gap-2.5 max-w-[75%] items-end">
                         <Avatar className="h-7 w-7 shrink-0 self-start mt-1">
-                            <AvatarImage src="/codesense-avatar.png" alt="AI" />
-                            <AvatarFallback className="text-xs">AI</AvatarFallback>
+                            <AvatarFallback className="text-xs bg-secondary">AI</AvatarFallback>
                         </Avatar>
                         <div className="rounded-xl px-3.5 py-2.5 text-sm bg-muted rounded-bl-none shadow-sm">
                             <div className="flex items-center space-x-1.5">
@@ -209,7 +211,11 @@ export default function ChatWindow({ repository }: ChatWindowProps) {
             disabled={isBotTyping}
             autoComplete="off"
           />
-          <Button type="submit" size="icon" disabled={isBotTyping || !newMessage.trim()}>
+          <Button 
+            type="submit" 
+            size="icon" 
+            disabled={isBotTyping || !newMessage.trim()}
+          >
             <Send className="h-4 w-4" />
             <span className="sr-only">Send message</span>
           </Button>

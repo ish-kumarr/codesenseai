@@ -51,9 +51,9 @@ export default function DashboardPage({
           <SummarySection owner={owner} repo={repo} />
         </Suspense>
         
-        <div>
-          <ChatWindow />
-        </div>
+        <Suspense fallback={<ChatSkeleton />}>
+          <ChatSection owner={owner} repo={repo} />
+        </Suspense>
       </div>
     </div>
   );
@@ -105,6 +105,22 @@ async function SummarySection({ owner, repo }: { owner: string; repo: string }) 
   }
 }
 
+async function ChatSection({ owner, repo }: { owner: string; repo: string }) {
+  try {
+    const repository = await fetchRepository(owner, repo);
+    return <ChatWindow repository={repository} />;
+  } catch (error) {
+    return (
+      <div className="bg-destructive/10 p-6 rounded-lg border border-destructive text-destructive">
+        <h3 className="font-bold mb-2">Error Loading Chat</h3>
+        <p className="text-sm">
+          {error instanceof Error ? error.message : "Failed to load chat interface"}
+        </p>
+      </div>
+    );
+  }
+}
+
 function RepositorySkeleton() {
   return (
     <div className="border rounded-lg p-6 space-y-4">
@@ -142,6 +158,24 @@ function SummarySkeleton() {
         <Skeleton className="h-4 w-3/4" />
         <Skeleton className="h-4 w-5/6" />
         <Skeleton className="h-4 w-full" />
+      </div>
+    </div>
+  );
+}
+
+function ChatSkeleton() {
+  return (
+    <div className="border rounded-lg p-6 space-y-4">
+      <div className="space-y-2">
+        <Skeleton className="h-7 w-1/2" />
+      </div>
+      <div className="space-y-3">
+        <Skeleton className="h-[60px] w-3/4" />
+        <Skeleton className="h-[60px] w-2/3 ml-auto" />
+        <Skeleton className="h-[60px] w-3/4" />
+      </div>
+      <div className="pt-4">
+        <Skeleton className="h-10 w-full" />
       </div>
     </div>
   );

@@ -11,8 +11,8 @@ export default function Navbar() {
   
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-sm">
-      <div className="container flex h-16 items-center justify-between">
-        <div className="flex items-center gap-2">
+      <div className="container flex h-16 items-center justify-center">
+        <nav className="flex w-full max-w-4xl items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="rounded-md bg-primary p-1.5">
               <CodeIcon className="h-5 w-5 text-primary-foreground" />
@@ -21,30 +21,30 @@ export default function Navbar() {
               <span className="text-primary">Code</span>Sense
             </span>
           </Link>
-        </div>
 
-        <nav className="flex items-center gap-4 sm:gap-6">
-          <Link 
-            href="/" 
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-primary",
-              pathname === "/" ? "text-primary" : "text-muted-foreground"
-            )}
-          >
-            Home
-          </Link>
-          <Link 
-            href="/dashboard" 
-            className={cn(
-              "text-sm font-medium transition-colors hover:text-primary",
-              pathname === "/dashboard" || pathname.startsWith("/dashboard/") 
-                ? "text-primary" 
-                : "text-muted-foreground"
-            )}
-          >
-            Dashboard
-          </Link>
-          <ThemeToggle />
+          <div className="flex items-center gap-6">
+            <Link 
+              href="/" 
+              className={cn(
+                "text-sm font-medium transition-colors hover:text-primary",
+                pathname === "/" ? "text-primary" : "text-muted-foreground"
+              )}
+            >
+              Home
+            </Link>
+            <Link 
+              href="/dashboard" 
+              className={cn(
+                "text-sm font-medium transition-colors hover:text-primary",
+                pathname === "/dashboard" || pathname.startsWith("/dashboard/") 
+                  ? "text-primary" 
+                  : "text-muted-foreground"
+              )}
+            >
+              Dashboard
+            </Link>
+            <ThemeToggle />
+          </div>
         </nav>
       </div>
     </header>

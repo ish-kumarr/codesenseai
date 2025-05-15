@@ -1,4 +1,3 @@
-// app/api/chat/route.ts
 import { NextResponse } from 'next/server';
 import {
     fetchRepository,
@@ -12,15 +11,13 @@ import {
 } from '@/lib/github';
 import { getChatResponse, GeminiResponse } from '@/lib/gemini';
 
-// Client-side message format
 interface ClientMessage {
   id: string;
   content: string;
   sender: "user" | "bot";
-  timestamp: Date; // Or string if you serialize it
+  timestamp: Date;
 }
 
-// Gemini's expected message format for history
 interface GeminiMessageForApi {
   role: 'user' | 'model';
   parts: { text: string }[];
@@ -28,7 +25,7 @@ interface GeminiMessageForApi {
 
 interface ChatRequestPayload {
   owner: string;
-  repoName: string; // Short name like 'my-repo'
+  repoName: string;
   question: string;
   chatHistory: ClientMessage[];
 }
@@ -40,36 +37,61 @@ function transformClientHistoryToGemini(clientHistory: ClientMessage[]): GeminiM
   }));
 }
 
+export const runtime = 'edge';
+
 export async function POST(request: Request) {
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json',
+  };
+
+  if (request.method === 'OPTIONS') {
+    return new NextResponse(null, { 
+      status: 200,
+      headers: corsHeaders
+    });
+  }
+
   try {
-    const payload = (await request.json()) as ChatRequestPayload;
+    const payload = await request.json() as ChatRequestPayload;
     const { owner, repoName, question, chatHistory } = payload;
 
     if (!owner || !repoName || !question) {
-      return NextResponse.json({ error: 'Missing owner, repoName, or question' }, { status: 400 });
+      return new NextResponse(
+        JSON.stringify({ error: 'Missing owner, repoName, or question' }),
+        { 
+          status: 400,
+          headers: corsHeaders
+        }
+      );
     }
 
-    // Fetch all necessary GitHub data
-    // These are cached by Next.js fetch (revalidate: 3600 in lib/github.ts)
     let repoData: Repository;
     let contents: RepositoryContent[];
     let languages: GithubLanguage[];
     let contributors: GithubContributor[];
 
     try {
-      // Parallelize GitHub data fetching
       [repoData, contents, languages, contributors] = await Promise.all([
         fetchRepository(owner, repoName),
-        fetchRepositoryContents(owner, repoName, ''), // Root contents
+        fetchRepositoryContents(owner, repoName, ''),
         fetchLanguages(owner, repoName),
         fetchContributors(owner, repoName)
       ]);
     } catch (githubError: any) {
       console.error("API Route: Error fetching GitHub data:", githubError);
-      return NextResponse.json({ 
-        answer: `I encountered an issue fetching data for ${owner}/${repoName} from GitHub: ${githubError.message}. Please ensure the repository exists and is accessible.`,
-        error: `GitHub fetch error: ${githubError.message}` 
-      }, { status: 500 });
+      return new NextResponse(
+        JSON.stringify({
+          answer: `I encountered an issue fetching data for ${owner}/${repoName} from GitHub: ${githubError.message}. Please ensure the repository exists and is accessible.`,
+          error: `GitHub fetch error: ${githubError.message}`
+        }),
+        { 
+          status: 500,
+          headers: corsHeaders
+        }
+      );
     }
     
     const geminiCompatibleHistory = transformClientHistoryToGemini(chatHistory || []);
@@ -83,22 +105,45 @@ export async function POST(request: Request) {
       geminiCompatibleHistory
     );
 
-    // If Gemini itself had an error but provided some text (e.g. its own error message)
     if (geminiResult.error && geminiResult.text) {
-        return NextResponse.json({ answer: geminiResult.text, error: geminiResult.error }, { status: 200 });
-    }
-    // If Gemini had an error and no text
-    if (geminiResult.error) {
-        return NextResponse.json({ answer: "An error occurred with the AI assistant.", error: geminiResult.error }, { status: 500 });
+      return new NextResponse(
+        JSON.stringify({ answer: geminiResult.text, error: geminiResult.error }),
+        { 
+          status: 200,
+          headers: corsHeaders
+        }
+      );
     }
 
-    return NextResponse.json({ answer: geminiResult.text });
+    if (geminiResult.error) {
+      return new NextResponse(
+        JSON.stringify({ answer: "An error occurred with the AI assistant.", error: geminiResult.error }),
+        { 
+          status: 500,
+          headers: corsHeaders
+        }
+      );
+    }
+
+    return new NextResponse(
+      JSON.stringify({ answer: geminiResult.text }),
+      { 
+        status: 200,
+        headers: corsHeaders
+      }
+    );
 
   } catch (error: any) {
     console.error('API chat route general error:', error);
-    return NextResponse.json({ 
+    return new NextResponse(
+      JSON.stringify({
         answer: `An internal server error occurred: ${error.message}`,
-        error: `Internal server error: ${error.message}` 
-    }, { status: 500 });
+        error: `Internal server error: ${error.message}`
+      }),
+      { 
+        status: 500,
+        headers: corsHeaders
+      }
+    );
   }
 }
